@@ -21,16 +21,18 @@ struct uni_platform* get_my_platform(void);
 #define BOOST2_MULTIPLIER 1.3
 #define BACKWARDS_THROTTLE 7
 #define STEERING_ANGLE 0.1
+#define STEP_SPEED 1
 
 #define LEFT_POSITIVE_TERMINAL 14
 #define LEFT_NEGATIVE_TERMINAL 15
-#define LEFT_SPEED_TERMINAL 13
 #define RIGHT_POSITIVE_TERMINAL 17
 #define RIGHT_NEGATIVE_TERMINAL 16
-#define RIGHT_SPEED_TERMINAL 18
 
 bool boost1 = false;
 bool boost1Toggle = false;
+
+int actualSpeedLeft = 0;
+int actualSpeedRight = 0;
 
 mutex_t mutexMainThread;
 
@@ -41,7 +43,7 @@ void bt_thread() {
 void init_pwm(uint gpio) {
     gpio_set_function(gpio, GPIO_FUNC_PWM);
     uint slice_num = pwm_gpio_to_slice_num(gpio);
-    pwm_set_wrap(slice_num, 255);  // 8-bit resolution
+    pwm_set_wrap(slice_num, 255);
     pwm_set_enabled(slice_num, true);
 }
 
@@ -68,18 +70,10 @@ int main() {
     mutex_init(&mutexMainThread);
     multicore_launch_core1(bt_thread);
 
-    init_pwm(RIGHT_SPEED_TERMINAL);
-    init_pwm(LEFT_SPEED_TERMINAL);
-
-    gpio_init(LEFT_NEGATIVE_TERMINAL);
-    gpio_init(RIGHT_NEGATIVE_TERMINAL);
-    gpio_init(LEFT_POSITIVE_TERMINAL);
-    gpio_init(RIGHT_POSITIVE_TERMINAL);
-
-    gpio_set_dir(LEFT_POSITIVE_TERMINAL, GPIO_OUT);
-    gpio_set_dir(LEFT_NEGATIVE_TERMINAL, GPIO_OUT);
-    gpio_set_dir(RIGHT_POSITIVE_TERMINAL, GPIO_OUT);
-    gpio_set_dir(RIGHT_NEGATIVE_TERMINAL, GPIO_OUT);
+    init_pwm(LEFT_NEGATIVE_TERMINAL);
+    init_pwm(RIGHT_NEGATIVE_TERMINAL);
+    init_pwm(LEFT_POSITIVE_TERMINAL);
+    init_pwm(RIGHT_POSITIVE_TERMINAL);
 
     int loopsSinceLastRumbleSync = 0;
     int loopsSinceLastLedSync = 0;
@@ -160,26 +154,30 @@ int main() {
                 BatteryLedIsInSync = false;
             }
 
-            logi("Speed: %d, Left Speed: %d, Right Speed: %d, battery: %d\n", speed, leftSpeed, rightSpeed, Battery);
+            logi("Speed: %d, Left Speed: %d, Right Speed: %d, actual speed left: %d right: %d, battery: %d\n", speed, leftSpeed, rightSpeed, actualSpeedLeft, actualSpeedRight, Battery);
+            if(actualSpeedLeft>leftSpeed)
+                actualSpeedLeft -= STEP_SPEED;
+            if(actualSpeedLeft<leftSpeed)
+                actualSpeedLeft += STEP_SPEED;
+            if(actualSpeedRight>rightSpeed)
+                actualSpeedRight -= STEP_SPEED;
+            if(actualSpeedRight<rightSpeed)
+                actualSpeedRight += STEP_SPEED;
 
-            if (leftSpeed > 0) {
-                analogWrite(LEFT_SPEED_TERMINAL, leftSpeed);
-                gpio_put(LEFT_POSITIVE_TERMINAL, true);
-                gpio_put(LEFT_NEGATIVE_TERMINAL, false);
+            if (actualSpeedLeft > 0) {
+                analogWrite(LEFT_POSITIVE_TERMINAL, actualSpeedLeft);
+                analogWrite(LEFT_NEGATIVE_TERMINAL, 0);
             } else {
-                analogWrite(LEFT_SPEED_TERMINAL, -leftSpeed);
-                gpio_put(LEFT_POSITIVE_TERMINAL, false);
-                gpio_put(LEFT_NEGATIVE_TERMINAL, true);
+                analogWrite(LEFT_POSITIVE_TERMINAL, 0);
+                analogWrite(LEFT_NEGATIVE_TERMINAL, -actualSpeedLeft);
             }
 
-            if (rightSpeed > 0) {
-                analogWrite(RIGHT_SPEED_TERMINAL, rightSpeed);
-                gpio_put(RIGHT_POSITIVE_TERMINAL, true);
-                gpio_put(RIGHT_NEGATIVE_TERMINAL, false);
+            if (actualSpeedRight > 0) {
+                analogWrite(RIGHT_POSITIVE_TERMINAL, actualSpeedRight);
+                analogWrite(RIGHT_NEGATIVE_TERMINAL, 0);
             } else {
-                analogWrite(RIGHT_SPEED_TERMINAL, -rightSpeed);
-                gpio_put(RIGHT_POSITIVE_TERMINAL, false);
-                gpio_put(RIGHT_NEGATIVE_TERMINAL, true);
+                analogWrite(RIGHT_POSITIVE_TERMINAL, 0);
+                analogWrite(RIGHT_NEGATIVE_TERMINAL, -actualSpeedRight);
             }
 
             if (R > 255)
