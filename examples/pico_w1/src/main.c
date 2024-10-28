@@ -28,6 +28,8 @@ struct uni_platform* get_my_platform(void);
 #define RIGHT_POSITIVE_TERMINAL 17
 #define RIGHT_NEGATIVE_TERMINAL 16
 
+#define VERBOSE_DEBUGGING true
+
 bool boost1 = false;
 bool boost1Toggle = false;
 
@@ -154,7 +156,9 @@ int main() {
                 BatteryLedIsInSync = false;
             }
 
-            logi("Speed: %d, Left Speed: %d, Right Speed: %d, actual speed left: %d right: %d, battery: %d\n", speed, leftSpeed, rightSpeed, actualSpeedLeft, actualSpeedRight, Battery);
+            if(VERBOSE_DEBUGGING)
+                logi("Speed: %d, Left Speed: %d, Right Speed: %d, actual speed left: %d right: %d, battery: %d\n", speed, leftSpeed, rightSpeed, actualSpeedLeft, actualSpeedRight, Battery);
+            
             if(actualSpeedLeft>leftSpeed)
                 actualSpeedLeft -= STEP_SPEED;
             if(actualSpeedLeft<leftSpeed)
